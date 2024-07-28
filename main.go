@@ -5,15 +5,18 @@ import (
 	"net/http"
 )
 
+const MAX_CHIRP_LENGTH = 140
+
 func main() {
 	const port = "8080"
 	mux := http.NewServeMux()
 	apiCfg := &apiConfig{fileServerHits: 0}
 	fs := http.StripPrefix("/app", http.FileServer(http.Dir(".")))
 	mux.Handle("/app/*", apiCfg.MiddlewareMetricsInc(fs))
-	mux.HandleFunc("/healthz", HandleHealthz)
-	mux.HandleFunc("/metrics", apiCfg.HandleMetrics)
-	mux.HandleFunc("/reset", apiCfg.HandleReset)
+	mux.HandleFunc("GET /api/healthz", HandleHealthz)
+	mux.HandleFunc("GET /admin/metrics", apiCfg.HandleMetrics)
+	mux.HandleFunc("/api/reset", apiCfg.HandleReset)
+	mux.HandleFunc("POST /api/validate_chirp", HandleValidateChirp)
 	srv := &http.Server{
 		Handler: mux,
 		Addr:    ":" + port,

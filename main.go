@@ -3,12 +3,17 @@ package main
 import (
 	"log"
 	"net/http"
-)
 
-const MAX_CHIRP_LENGTH = 140
+	"github.com/closknight/Chirpy/internal/database"
+)
 
 func main() {
 	const port = "8080"
+	database_path := "database.json"
+	db, err := database.NewDB(database_path)
+	if err != nil {
+		log.Fatal(err)
+	}
 	mux := http.NewServeMux()
 	apiCfg := &apiConfig{fileServerHits: 0}
 	fs := http.StripPrefix("/app", http.FileServer(http.Dir(".")))
@@ -16,7 +21,8 @@ func main() {
 	mux.HandleFunc("GET /api/healthz", HandleHealthz)
 	mux.HandleFunc("GET /admin/metrics", apiCfg.HandleMetrics)
 	mux.HandleFunc("/api/reset", apiCfg.HandleReset)
-	mux.HandleFunc("POST /api/validate_chirp", HandleValidateChirp)
+	mux.HandleFunc("POST /api/chirps", db.HandleNewChirp)
+	mux.HandleFunc("GET /api/chirps", db.HandleGetChirps)
 	srv := &http.Server{
 		Handler: mux,
 		Addr:    ":" + port,

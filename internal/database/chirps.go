@@ -1,4 +1,4 @@
-package main
+package database
 
 import (
 	"encoding/json"
@@ -7,13 +7,11 @@ import (
 	"strings"
 )
 
-func HandleValidateChirp(w http.ResponseWriter, r *http.Request) {
+const MAX_CHIRP_LENGTH = 140
+
+func (db *DB) HandleNewChirp(w http.ResponseWriter, r *http.Request) {
 	type parameters struct {
 		Body string `json:"body"`
-	}
-
-	type resp struct {
-		CleanedBody string `json:"cleaned_body"`
 	}
 
 	decoder := json.NewDecoder(r.Body)
@@ -28,7 +26,22 @@ func HandleValidateChirp(w http.ResponseWriter, r *http.Request) {
 		respondWithError(w, http.StatusBadRequest, "Chirp is too long")
 		return
 	}
-	respondWithJSON(w, http.StatusOK, resp{CleanedBody: RemoveProfanity(chirp.Body)})
+
+	newChirp, err := db.CreateChirp(RemoveProfanity(chirp.Body))
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Could not create chirp")
+	} else {
+		respondWithJSON(w, http.StatusCreated, newChirp)
+	}
+}
+
+func (db *DB) HandleGetChirps(w http.ResponseWriter, r *http.Request) {
+	chirps, err := db.GetChirps()
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, err.Error())
+	} else {
+		respondWithJSON(w, http.StatusOK, chirps)
+	}
 }
 
 func respondWithError(w http.ResponseWriter, code int, msg string) {

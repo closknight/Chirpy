@@ -9,8 +9,6 @@ import (
 	"sync"
 )
 
-var chirps_count = 1
-
 type Chirp struct {
 	Id   int    `json:"id"`
 	Body string `json:"body"`
@@ -18,7 +16,7 @@ type Chirp struct {
 
 type DB struct {
 	path string
-	mux  *sync.RWMutex
+	mu   *sync.RWMutex
 }
 
 type DBStructure struct {
@@ -30,14 +28,23 @@ type DBStructure struct {
 func NewDB(path string) (*DB, error) {
 	database := DB{
 		path: path,
-		mux:  &sync.RWMutex{},
+		mu:   &sync.RWMutex{},
 	}
 
 	err := database.ensureDB()
+	return &database, err
+}
+
+func (db *DB) GetChirp(id int) (Chirp, error) {
+	dbs, err := db.loadDB()
 	if err != nil {
-		return &DB{}, err
+		return Chirp{}, err
 	}
-	return &database, nil
+	chirp, ok := dbs.Chirps[id]
+	if !ok {
+		return Chirp{}, errors.New("resource does not exist")
+	}
+	return chirp, nil
 }
 
 // GetChirps returns all chirps in the database
@@ -57,69 +64,62 @@ func (db *DB) GetChirps() ([]Chirp, error) {
 
 // CreateChirp creates a new chirp and saves it to disk
 func (db *DB) CreateChirp(body string) (Chirp, error) {
-	chirp := Chirp{
-		Body: body,
-		Id:   chirps_count,
-	}
-
 	dbs, err := db.loadDB()
 	if err != nil {
 		return Chirp{}, err
 	}
+
+	id := len(dbs.Chirps) + 1
+	chirp := Chirp{
+		Body: body,
+		Id:   id,
+	}
+
 	dbs.Chirps[len(dbs.Chirps)+1] = chirp
 	err = db.writeDB(dbs)
 	if err != nil {
 		return Chirp{}, err
 	}
-	chirps_count++
 	return chirp, nil
 }
 
 // ensureDB creates a new database file if it doesn't exist
 func (db *DB) ensureDB() error {
-	db.mux.Lock()
-	defer db.mux.Unlock()
-
 	_, err := os.ReadFile(db.path)
-
 	if errors.Is(err, fs.ErrNotExist) {
 		dbs := DBStructure{Chirps: map[int]Chirp{}}
-		data, err := json.Marshal(dbs)
-		if err != nil {
-			return err
-		}
-		err = os.WriteFile(db.path, data, 0666)
-		return err
+		return db.writeDB(dbs)
 	}
 	return err
 }
 
 // loadDB reads the database file into memory
 func (db *DB) loadDB() (DBStructure, error) {
-	db.mux.RLock()
-	defer db.mux.RUnlock()
+	db.mu.RLock()
+	defer db.mu.RUnlock()
+
+	dbs := DBStructure{}
 
 	data, err := os.ReadFile(db.path)
 	if err != nil {
-		return DBStructure{}, err
+		return dbs, err
 	}
-	dbs := DBStructure{}
 	err = json.Unmarshal(data, &dbs)
 	if err != nil {
-		return DBStructure{}, err
+		return dbs, err
 	}
 	return dbs, nil
 }
 
 // writeDB writes the database file to disk
 func (db *DB) writeDB(dbStructure DBStructure) error {
-	db.mux.Lock()
-	defer db.mux.Unlock()
+	db.mu.Lock()
+	defer db.mu.Unlock()
 
 	data, err := json.Marshal(dbStructure)
 	if err != nil {
 		return err
 	}
-	err = os.WriteFile(db.path, data, 0666)
+	err = os.WriteFile(db.path, data, 0600)
 	return err
 }

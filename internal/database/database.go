@@ -14,6 +14,11 @@ type Chirp struct {
 	Body string `json:"body"`
 }
 
+type User struct {
+	Id    int    `json:"id"`
+	Email string `json:"email"`
+}
+
 type DB struct {
 	path string
 	mu   *sync.RWMutex
@@ -21,6 +26,7 @@ type DB struct {
 
 type DBStructure struct {
 	Chirps map[int]Chirp `json:"chirps"`
+	Users  map[int]User  `json:"users"`
 }
 
 // NewDB creates a new database connection
@@ -75,7 +81,7 @@ func (db *DB) CreateChirp(body string) (Chirp, error) {
 		Id:   id,
 	}
 
-	dbs.Chirps[len(dbs.Chirps)+1] = chirp
+	dbs.Chirps[id] = chirp
 	err = db.writeDB(dbs)
 	if err != nil {
 		return Chirp{}, err
@@ -83,11 +89,34 @@ func (db *DB) CreateChirp(body string) (Chirp, error) {
 	return chirp, nil
 }
 
+func (db *DB) CreateUser(email string) (User, error) {
+	dbs, err := db.loadDB()
+	if err != nil {
+		return User{}, err
+	}
+
+	id := len(dbs.Users) + 1
+	user := User{
+		Email: email,
+		Id:    id,
+	}
+
+	dbs.Users[id] = user
+	err = db.writeDB(dbs)
+	if err != nil {
+		return User{}, err
+	}
+	return user, nil
+}
+
 // ensureDB creates a new database file if it doesn't exist
 func (db *DB) ensureDB() error {
 	_, err := os.ReadFile(db.path)
 	if errors.Is(err, fs.ErrNotExist) {
-		dbs := DBStructure{Chirps: map[int]Chirp{}}
+		dbs := DBStructure{
+			Chirps: map[int]Chirp{},
+			Users:  map[int]User{},
+		}
 		return db.writeDB(dbs)
 	}
 	return err

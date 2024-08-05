@@ -33,12 +33,7 @@ func (db *DB) CreateUser(email, password string) (User, error) {
 	if err != nil {
 		return User{}, err
 	}
-	resp := User{
-		Email: user.Email,
-		Id:    user.Id,
-	}
-
-	return resp, nil
+	return user, nil
 }
 
 func (dbs *DBStructure) findUser(email string) (User, bool) {
@@ -58,6 +53,39 @@ func (db *DB) GetUserByEmail(email string) (User, error) {
 	user, ok := dbs.findUser(email)
 	if !ok {
 		return User{}, errors.New("user not found")
+	}
+	return user, nil
+}
+
+func (db *DB) GetUserById(id int) (User, error) {
+	dbs, err := db.loadDB()
+	if err != nil {
+		return User{}, err
+	}
+	user, ok := dbs.Users[id]
+	if !ok {
+		return User{}, errors.New("user not found")
+	}
+	return user, nil
+}
+
+func (db *DB) UpdateUser(user User) (User, error) {
+	dbs, err := db.loadDB()
+	if err != nil {
+		return user, err
+	}
+
+	if _, ok := dbs.Users[user.Id]; !ok {
+		return user, errors.New("trying to update invalid user")
+	}
+	if dupe, ok := dbs.findUser(user.Email); ok && dupe.Id != user.Id {
+		return user, errors.New("email already in used")
+	}
+
+	dbs.Users[user.Id] = user
+	err = db.writeDB(dbs)
+	if err != nil {
+		return User{}, err
 	}
 	return user, nil
 }

@@ -8,14 +8,22 @@ import (
 	"os"
 
 	"github.com/closknight/Chirpy/internal/database"
+	"github.com/joho/godotenv"
 )
 
 type apiConfig struct {
 	fileServerHits int
 	DB             *database.DB
+	jwtSecret      string
 }
 
 func main() {
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatal("error loading .env file")
+	}
+	jwtSecret := os.Getenv("JWT_SECRET")
+
 	dbg := flag.Bool("debug", false, "Enable debug mode")
 	flag.Parse()
 
@@ -36,6 +44,7 @@ func main() {
 	apiCfg := &apiConfig{
 		fileServerHits: 0,
 		DB:             db,
+		jwtSecret:      jwtSecret,
 	}
 	mux := http.NewServeMux()
 	fs := http.StripPrefix("/app", http.FileServer(http.Dir(".")))
@@ -46,8 +55,9 @@ func main() {
 	mux.HandleFunc("POST /api/chirps", apiCfg.HandleCreateChirp)
 	mux.HandleFunc("GET /api/chirps", apiCfg.HandleGetChirps)
 	mux.HandleFunc("GET /api/chirps/{chirpID}", apiCfg.HandleGetChipByID)
-	mux.HandleFunc("POST /api/users", apiCfg.HandleCreateUser)
 	mux.HandleFunc("POST /api/login", apiCfg.HandleLogin)
+	mux.HandleFunc("POST /api/users", apiCfg.HandleCreateUser)
+	mux.HandleFunc("PUT /api/users", apiCfg.HandleUpdateUser)
 
 	srv := &http.Server{
 		Handler: mux,

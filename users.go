@@ -2,13 +2,13 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/closknight/Chirpy/internal/auth"
-	"github.com/golang-jwt/jwt/v5"
 )
 
 type User struct {
@@ -73,73 +73,53 @@ func (cfg *apiConfig) HandleLogin(w http.ResponseWriter, r *http.Request) {
 		ttl = time.Duration(userReq.ExpiresInSeconds * int(time.Second))
 	}
 
-	claims := jwt.RegisteredClaims{
-		ExpiresAt: jwt.NewNumericDate(time.Now().Add(ttl)),
-		IssuedAt:  jwt.NewNumericDate(time.Now()),
-		Issuer:    "Chirpy",
-		Subject:   strconv.Itoa(user.Id),
-	}
-
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	ss, err := token.SignedString([]byte(cfg.jwtSecret))
+	tokenString, err := auth.CreateJWT(user.Id, cfg.jwtSecret, ttl)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	respondWithJSON(w, http.StatusOK, User{Id: user.Id, Email: user.Email, Token: ss})
+	respondWithJSON(w, http.StatusOK, User{Id: user.Id, Email: user.Email, Token: tokenString})
 }
 
 func (cfg apiConfig) HandleUpdateUser(w http.ResponseWriter, r *http.Request) {
-	tokenString := gettokenString(r)
-	token, err := jwt.ParseWithClaims(tokenString, &jwt.RegisteredClaims{}, func(token *jwt.Token) (interface{}, error) {
-		return []byte(cfg.jwtSecret), nil
-	})
+	type parameters struct {
+		Password string `json:"password"`
+		Email    string `json:"email"`
+	}
+
+	tokenString, err := gettokenString(r)
 	if err != nil {
-		respondWithError(w, http.StatusUnauthorized, "incorrect token")
+		respondWithError(w, http.StatusUnauthorized, err.Error())
 		return
 	}
-	idString, err := token.Claims.GetSubject()
+
+	idString, err := auth.ValidateJWT(tokenString, cfg.jwtSecret)
 	if err != nil {
-		respondWithError(w, http.StatusUnauthorized, "users token has no id")
-		return
+		respondWithError(w, http.StatusUnauthorized, err.Error())
 	}
+
 	id, err := strconv.Atoi(idString)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "could not parse token id")
 		return
 	}
-	user, err := cfg.DB.GetUserById(id)
-	if err != nil {
-		respondWithError(w, http.StatusUnauthorized, "could not find users id")
-		return
-	}
 
-	type parameters struct {
-		Password string `json:"password"`
-		Email    string `json:"email"`
-	}
 	decoder := json.NewDecoder(r.Body)
 	userReq := parameters{}
 	err = decoder.Decode(&userReq)
 	if err != nil {
-		respondWithError(w, http.StatusBadRequest, err.Error())
+		respondWithError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	if len(userReq.Email) > 0 {
-		user.Email = userReq.Email
-	}
-	if len(userReq.Password) > 0 {
-		hash, err := auth.HashPassword(userReq.Password)
+	hash, err := auth.HashPassword(userReq.Password)
 
-		if err != nil {
-			respondWithError(w, http.StatusInternalServerError, err.Error())
-			return
-		}
-		user.HashPassword = hash
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, err.Error())
+		return
 	}
 
-	user, err = cfg.DB.UpdateUser(user)
+	user, err := cfg.DB.UpdateUser(id, userReq.Email, hash)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Problem updating user")
 		return
@@ -147,10 +127,10 @@ func (cfg apiConfig) HandleUpdateUser(w http.ResponseWriter, r *http.Request) {
 	respondWithJSON(w, http.StatusOK, User{Id: user.Id, Email: user.Email})
 }
 
-func gettokenString(r *http.Request) string {
+func gettokenString(r *http.Request) (string, error) {
 	header := strings.Split(r.Header.Get("Authorization"), " ")
-	if len(header) != 2 {
-		return ""
+	if len(header) < 2 || header[0] != "Bearer" {
+		return "", errors.New("invalid header")
 	}
-	return header[1]
+	return header[1], nil
 }

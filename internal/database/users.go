@@ -69,23 +69,28 @@ func (db *DB) GetUserById(id int) (User, error) {
 	return user, nil
 }
 
-func (db *DB) UpdateUser(user User) (User, error) {
+func (db *DB) UpdateUser(userID int, email, hashedPassword string) (User, error) {
 	dbs, err := db.loadDB()
 	if err != nil {
-		return user, err
+		return User{}, err
 	}
 
-	if _, ok := dbs.Users[user.Id]; !ok {
-		return user, errors.New("trying to update invalid user")
+	user, ok := dbs.Users[userID]
+	if !ok {
+		return User{}, errors.New("user does not exist")
 	}
-	if dupe, ok := dbs.findUser(user.Email); ok && dupe.Id != user.Id {
-		return user, errors.New("email already in used")
+	if dupe, ok := dbs.findUser(email); ok && dupe.Id != userID {
+		return User{}, errors.New("email already in used")
 	}
 
-	dbs.Users[user.Id] = user
+	user.Email = email
+	user.HashPassword = hashedPassword
+	dbs.Users[userID] = user
+
 	err = db.writeDB(dbs)
 	if err != nil {
 		return User{}, err
 	}
+
 	return user, nil
 }

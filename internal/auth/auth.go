@@ -1,6 +1,8 @@
 package auth
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"strconv"
 	"time"
@@ -8,6 +10,16 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
 )
+
+func CreateRefreshToken() (string, error) {
+	token_bytes := make([]byte, 32)
+	_, err := rand.Read(token_bytes)
+	if err != nil {
+		return "", err
+	}
+	token_string := hex.EncodeToString(token_bytes)
+	return token_string, nil
+}
 
 func HashPassword(password string) (string, error) {
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)

@@ -12,9 +12,10 @@ import (
 )
 
 type User struct {
-	Id    int    `json:"id"`
-	Email string `json:"email"`
-	Token string `json:"token"`
+	Id           int    `json:"id"`
+	Email        string `json:"email"`
+	Token        string `json:"token"`
+	RefreshToken string `json:"refresh_token"`
 }
 
 func (cfg *apiConfig) HandleCreateUser(w http.ResponseWriter, r *http.Request) {
@@ -45,6 +46,48 @@ func (cfg *apiConfig) HandleCreateUser(w http.ResponseWriter, r *http.Request) {
 	respondWithJSON(w, http.StatusCreated, User{Id: newUser.Id, Email: newUser.Email})
 }
 
+func (cfg *apiConfig) HandleRefreshLogin(w http.ResponseWriter, r *http.Request) {
+	type Resp struct {
+		Token string `json:"token"`
+	}
+
+	tokenString, err := gettokenString(r)
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, err.Error())
+		return
+	}
+	user, err := cfg.DB.GetUserFromRefreshToken(tokenString)
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, err.Error())
+		return
+	}
+	if user.RefreshToken.Exp.Before(time.Now().UTC()) {
+		respondWithError(w, http.StatusUnauthorized, "refresh token expired")
+		return
+	}
+
+	access_token, err := auth.CreateJWT(user.Id, cfg.jwtSecret, time.Hour)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "could not create access token")
+		return
+	}
+	respondWithJSON(w, http.StatusOK, Resp{Token: access_token})
+}
+
+func (cfg *apiConfig) HandleRevokeToken(w http.ResponseWriter, r *http.Request) {
+	tokenString, err := gettokenString(r)
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, err.Error())
+		return
+	}
+	err = cfg.DB.RevokeRefreshToken(tokenString)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	respondWithJSON(w, http.StatusNoContent, struct{}{})
+}
+
 func (cfg *apiConfig) HandleLogin(w http.ResponseWriter, r *http.Request) {
 	type parameters struct {
 		Password         string `json:"password"`
@@ -56,6 +99,7 @@ func (cfg *apiConfig) HandleLogin(w http.ResponseWriter, r *http.Request) {
 	err := decoder.Decode(&userReq)
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, "incorrect login request")
+		return
 	}
 	user, err := cfg.DB.GetUserByEmail(userReq.Email)
 	if err != nil {
@@ -68,7 +112,7 @@ func (cfg *apiConfig) HandleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ttl := 24 * time.Hour
+	ttl := time.Hour
 	if userReq.ExpiresInSeconds > 0 && userReq.ExpiresInSeconds < int(ttl.Seconds()) {
 		ttl = time.Duration(userReq.ExpiresInSeconds * int(time.Second))
 	}
@@ -78,7 +122,17 @@ func (cfg *apiConfig) HandleLogin(w http.ResponseWriter, r *http.Request) {
 		respondWithError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	respondWithJSON(w, http.StatusOK, User{Id: user.Id, Email: user.Email, Token: tokenString})
+
+	user, err = cfg.DB.UpdateRefreshToken(user.Id)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	respondWithJSON(
+		w,
+		http.StatusOK,
+		User{Id: user.Id, Email: user.Email, Token: tokenString, RefreshToken: user.RefreshToken.Token})
 }
 
 func (cfg apiConfig) HandleUpdateUser(w http.ResponseWriter, r *http.Request) {

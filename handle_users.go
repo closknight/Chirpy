@@ -53,16 +53,12 @@ func (cfg *apiConfig) HandleRefreshLogin(w http.ResponseWriter, r *http.Request)
 
 	tokenString, err := gettokenString(r)
 	if err != nil {
-		respondWithError(w, http.StatusUnauthorized, err.Error())
+		respondWithError(w, http.StatusBadRequest, "could not find token")
 		return
 	}
 	user, err := cfg.DB.GetUserFromRefreshToken(tokenString)
 	if err != nil {
 		respondWithError(w, http.StatusUnauthorized, err.Error())
-		return
-	}
-	if user.RefreshToken.Exp.Before(time.Now().UTC()) {
-		respondWithError(w, http.StatusUnauthorized, "refresh token expired")
 		return
 	}
 
@@ -77,15 +73,15 @@ func (cfg *apiConfig) HandleRefreshLogin(w http.ResponseWriter, r *http.Request)
 func (cfg *apiConfig) HandleRevokeToken(w http.ResponseWriter, r *http.Request) {
 	tokenString, err := gettokenString(r)
 	if err != nil {
-		respondWithError(w, http.StatusUnauthorized, err.Error())
+		respondWithError(w, http.StatusBadRequest, "could not find token")
 		return
 	}
 	err = cfg.DB.RevokeRefreshToken(tokenString)
 	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, err.Error())
+		respondWithError(w, http.StatusInternalServerError, "could not revoke token")
 		return
 	}
-	respondWithJSON(w, http.StatusNoContent, struct{}{})
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (cfg *apiConfig) HandleLogin(w http.ResponseWriter, r *http.Request) {
@@ -123,16 +119,22 @@ func (cfg *apiConfig) HandleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err = cfg.DB.UpdateRefreshToken(user.Id)
+	refreshToken, err := auth.CreateRefreshToken()
 	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, err.Error())
+		respondWithError(w, http.StatusInternalServerError, "could not create refresh token")
+		return
+	}
+
+	err = cfg.DB.SaveRefreshToken(user.Id, refreshToken)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "could not save refresh token")
 		return
 	}
 
 	respondWithJSON(
 		w,
 		http.StatusOK,
-		User{Id: user.Id, Email: user.Email, Token: tokenString, RefreshToken: user.RefreshToken.Token})
+		User{Id: user.Id, Email: user.Email, Token: tokenString, RefreshToken: refreshToken})
 }
 
 func (cfg apiConfig) HandleUpdateUser(w http.ResponseWriter, r *http.Request) {

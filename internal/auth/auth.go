@@ -4,12 +4,22 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
+	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
 )
+
+func ParseBearer(header http.Header) (string, error) {
+	splitHeader := strings.Split(header.Get("Authorization"), " ")
+	if len(splitHeader) < 2 || splitHeader[0] != "Bearer" {
+		return "", errors.New("invalid header")
+	}
+	return splitHeader[1], nil
+}
 
 func CreateRefreshToken() (string, error) {
 	token_bytes := make([]byte, 32)

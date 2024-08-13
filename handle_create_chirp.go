@@ -3,7 +3,10 @@ package main
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"strings"
+
+	"github.com/closknight/Chirpy/internal/auth"
 )
 
 const MAX_CHIRP_LENGTH = 140
@@ -13,9 +16,27 @@ func (cfg *apiConfig) HandleCreateChirp(w http.ResponseWriter, r *http.Request) 
 		Body string `json:"body"`
 	}
 
+	jwtToken, err := auth.ParseBearer(r.Header)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "could not retrieve auth token")
+		return
+	}
+
+	idString, err := auth.ValidateJWT(jwtToken, cfg.jwtSecret)
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, "unauthorized user")
+		return
+	}
+
+	id, err := strconv.Atoi(idString)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "could not parse token id")
+		return
+	}
+
 	decoder := json.NewDecoder(r.Body)
 	chirp := parameters{}
-	err := decoder.Decode(&chirp)
+	err = decoder.Decode(&chirp)
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, "Could't decode request")
 		return
@@ -26,7 +47,7 @@ func (cfg *apiConfig) HandleCreateChirp(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	newChirp, err := cfg.DB.CreateChirp(sanitize(chirp.Body))
+	newChirp, err := cfg.DB.CreateChirp(id, sanitize(chirp.Body))
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Could not create chirp")
 	} else {

@@ -2,10 +2,8 @@ package main
 
 import (
 	"encoding/json"
-	"errors"
 	"net/http"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/closknight/Chirpy/internal/auth"
@@ -51,7 +49,7 @@ func (cfg *apiConfig) HandleRefreshLogin(w http.ResponseWriter, r *http.Request)
 		Token string `json:"token"`
 	}
 
-	tokenString, err := gettokenString(r)
+	tokenString, err := auth.ParseBearer(r.Header)
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, "could not find token")
 		return
@@ -71,7 +69,7 @@ func (cfg *apiConfig) HandleRefreshLogin(w http.ResponseWriter, r *http.Request)
 }
 
 func (cfg *apiConfig) HandleRevokeToken(w http.ResponseWriter, r *http.Request) {
-	tokenString, err := gettokenString(r)
+	tokenString, err := auth.ParseBearer(r.Header)
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, "could not find token")
 		return
@@ -143,7 +141,7 @@ func (cfg apiConfig) HandleUpdateUser(w http.ResponseWriter, r *http.Request) {
 		Email    string `json:"email"`
 	}
 
-	tokenString, err := gettokenString(r)
+	tokenString, err := auth.ParseBearer(r.Header)
 	if err != nil {
 		respondWithError(w, http.StatusUnauthorized, err.Error())
 		return
@@ -181,12 +179,4 @@ func (cfg apiConfig) HandleUpdateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	respondWithJSON(w, http.StatusOK, User{Id: user.Id, Email: user.Email})
-}
-
-func gettokenString(r *http.Request) (string, error) {
-	header := strings.Split(r.Header.Get("Authorization"), " ")
-	if len(header) < 2 || header[0] != "Bearer" {
-		return "", errors.New("invalid header")
-	}
-	return header[1], nil
 }

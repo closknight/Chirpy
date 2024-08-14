@@ -14,6 +14,7 @@ type User struct {
 	Email        string `json:"email"`
 	Token        string `json:"token"`
 	RefreshToken string `json:"refresh_token"`
+	IsChirpyRed  bool   `json:"is_chirpy_red"`
 }
 
 func (cfg *apiConfig) HandleCreateUser(w http.ResponseWriter, r *http.Request) {
@@ -41,7 +42,10 @@ func (cfg *apiConfig) HandleCreateUser(w http.ResponseWriter, r *http.Request) {
 		respondWithError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	respondWithJSON(w, http.StatusCreated, User{Id: newUser.Id, Email: newUser.Email})
+	respondWithJSON(
+		w,
+		http.StatusCreated,
+		User{Id: newUser.Id, Email: newUser.Email, IsChirpyRed: newUser.IsChirpyRed})
 }
 
 func (cfg *apiConfig) HandleRefreshLogin(w http.ResponseWriter, r *http.Request) {
@@ -132,7 +136,13 @@ func (cfg *apiConfig) HandleLogin(w http.ResponseWriter, r *http.Request) {
 	respondWithJSON(
 		w,
 		http.StatusOK,
-		User{Id: user.Id, Email: user.Email, Token: tokenString, RefreshToken: refreshToken})
+		User{
+			Id:           user.Id,
+			Email:        user.Email,
+			Token:        tokenString,
+			RefreshToken: refreshToken,
+			IsChirpyRed:  user.IsChirpyRed,
+		})
 }
 
 func (cfg apiConfig) HandleUpdateUser(w http.ResponseWriter, r *http.Request) {
@@ -178,5 +188,5 @@ func (cfg apiConfig) HandleUpdateUser(w http.ResponseWriter, r *http.Request) {
 		respondWithError(w, http.StatusInternalServerError, "Problem updating user")
 		return
 	}
-	respondWithJSON(w, http.StatusOK, User{Id: user.Id, Email: user.Email})
+	respondWithJSON(w, http.StatusOK, User{Id: user.Id, Email: user.Email, IsChirpyRed: user.IsChirpyRed})
 }

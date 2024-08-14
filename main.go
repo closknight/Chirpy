@@ -54,12 +54,15 @@ func main() {
 	mux.HandleFunc("/api/reset", apiCfg.HandleReset)
 	mux.HandleFunc("POST /api/chirps", apiCfg.HandleCreateChirp)
 	mux.HandleFunc("GET /api/chirps", apiCfg.HandleGetChirps)
-	mux.HandleFunc("GET /api/chirps/{chirpID}", apiCfg.HandleGetChipByID)
+	mux.HandleFunc("GET /api/chirps/{chirpID}", apiCfg.HandleGetChirpByID)
+	mux.HandleFunc("DELETE /api/chirps/{chirpID}", apiCfg.HandleDeleteChirpByID)
 	mux.HandleFunc("POST /api/login", apiCfg.HandleLogin)
 	mux.HandleFunc("POST /api/users", apiCfg.HandleCreateUser)
 	mux.HandleFunc("PUT /api/users", apiCfg.HandleUpdateUser)
 	mux.HandleFunc("POST /api/refresh", apiCfg.HandleRefreshLogin)
 	mux.HandleFunc("POST /api/revoke", apiCfg.HandleRevokeToken)
+
+	mux.HandleFunc("POST /api/polka/webhooks", apiCfg.HandlePolkaWebhooks)
 
 	srv := &http.Server{
 		Handler: mux,

@@ -8,6 +8,7 @@ type User struct {
 	Id           int    `json:"id"`
 	Email        string `json:"email"`
 	HashPassword string `json:"hash_password"`
+	IsChirpyRed  bool   `json:"is_chirpy_red"`
 }
 
 func (db *DB) CreateUser(email, password string) (User, error) {
@@ -26,6 +27,7 @@ func (db *DB) CreateUser(email, password string) (User, error) {
 		Email:        email,
 		Id:           id,
 		HashPassword: password,
+		IsChirpyRed:  false,
 	}
 
 	dbs.Users[id] = user
@@ -34,6 +36,22 @@ func (db *DB) CreateUser(email, password string) (User, error) {
 		return User{}, err
 	}
 	return user, nil
+}
+
+func (db *DB) UpgradeUsertoRed(userID int) error {
+	dbs, err := db.loadDB()
+	if err != nil {
+		return err
+	}
+
+	user, ok := dbs.Users[userID]
+	if !ok {
+		return errors.New("can't find user")
+	}
+	user.IsChirpyRed = true
+	dbs.Users[userID] = user
+	err = db.writeDB(dbs)
+	return err
 }
 
 func (dbs *DBStructure) findUserByEmail(email string) (User, bool) {

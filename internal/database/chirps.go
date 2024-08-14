@@ -59,3 +59,13 @@ func (db *DB) CreateChirp(userId int, body string) (Chirp, error) {
 	}
 	return chirp, nil
 }
+
+func (db *DB) DeleteChirp(id int) error {
+	dbs, err := db.loadDB()
+	if err != nil {
+		return err
+	}
+	delete(dbs.Chirps, id)
+	err = db.writeDB(dbs)
+	return err
+}

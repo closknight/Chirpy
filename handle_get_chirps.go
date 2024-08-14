@@ -14,11 +14,12 @@ func (cfg *apiConfig) HandleGetChirps(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (cfg *apiConfig) HandleGetChipByID(w http.ResponseWriter, r *http.Request) {
+func (cfg *apiConfig) HandleGetChirpByID(w http.ResponseWriter, r *http.Request) {
 	idStr := r.PathValue("chirpID")
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, err.Error())
+		return
 	}
 	chirp, err := cfg.DB.GetChirp(id)
 	if err != nil {

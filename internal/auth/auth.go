@@ -21,6 +21,14 @@ func ParseBearer(header http.Header) (string, error) {
 	return splitHeader[1], nil
 }
 
+func ParseAPIKEY(header http.Header) (string, error) {
+	splitHeader := strings.Split(header.Get("Authorization"), " ")
+	if len(splitHeader) < 2 || splitHeader[0] != "ApiKey" {
+		return "", errors.New("invalid header")
+	}
+	return splitHeader[1], nil
+}
+
 func CreateRefreshToken() (string, error) {
 	token_bytes := make([]byte, 32)
 	_, err := rand.Read(token_bytes)

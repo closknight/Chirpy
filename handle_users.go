@@ -160,6 +160,7 @@ func (cfg apiConfig) HandleUpdateUser(w http.ResponseWriter, r *http.Request) {
 	idString, err := auth.ValidateJWT(tokenString, cfg.jwtSecret)
 	if err != nil {
 		respondWithError(w, http.StatusUnauthorized, err.Error())
+		return
 	}
 
 	id, err := strconv.Atoi(idString)

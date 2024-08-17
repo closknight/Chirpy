@@ -25,7 +25,6 @@ func (db *DB) GetChirp(id int) (Chirp, error) {
 
 // GetChirps returns all chirps in the database
 func (db *DB) GetChirps() ([]Chirp, error) {
-
 	dbs, err := db.loadDB()
 	if err != nil {
 		return []Chirp{}, err
